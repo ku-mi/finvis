@@ -29,9 +29,20 @@ export function colorIndex(order: string[], key: string): number {
   return i >= 0 && i < SLOTS ? i : -1;
 }
 
+/**
+ * Warm-grey steps for categories past the colour slots. Alternating light/dark so neighbours in a
+ * stack stay apart; identity is carried by the legend and tooltip, never by these greys alone.
+ */
+export const NEUTRALS: Record<Mode, string[]> = {
+  light: ["#6f6e69", "#c9c8c0", "#8f8e88", "#dcdbd3", "#55544f", "#b1b0a8"],
+  dark: ["#9a9890", "#4a4a46", "#c3c2b7", "#5d5c58", "#acaba2", "#3c3c39"],
+};
+
 export function colorOf(mode: Mode, order: string[], key: string): string {
   const i = colorIndex(order, key);
-  return i < 0 ? INK[mode].other : SERIES[mode][i];
+  if (i >= 0) return SERIES[mode][i];
+  const rank = order.filter((k) => k !== "Uncategorised").indexOf(key);
+  return rank < 0 ? INK[mode].other : NEUTRALS[mode][(rank - SLOTS) % NEUTRALS[mode].length];
 }
 
 /** Fold anything outside the colour slots into "Other" (keeps stacks readable). */
@@ -41,8 +52,10 @@ export function foldKey(order: string[], key: string): string {
 
 export const GROUP_COLOR = (mode: Mode) => ({
   fixed: SERIES[mode][0],
-  essentials: SERIES[mode][2],
   lifestyle: SERIES[mode][1],
-  business: INK[mode].other,
+  essentials: SERIES[mode][2],
+  business: SERIES[mode][3],
+  taxes: SERIES[mode][6],
+  other: INK[mode].other,
   income: SERIES[mode][5],
 });

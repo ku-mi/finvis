@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { shiftMonth } from "@/lib/aggregate";
 import { ymLong } from "@/lib/format";
+import { CategoryFilter } from "./CategoryFilter";
 import { Uploader, useData } from "./DataProvider";
 
 const NAV = [
@@ -129,6 +130,8 @@ function FilterBar() {
         <input type="checkbox" checked={filters.includeTransfers} onChange={(e) => setFilters({ includeTransfers: e.target.checked })} />
         Include internal transfers
       </label>
+      <span className="sep" />
+      <CategoryFilter />
     </div>
   );
 }

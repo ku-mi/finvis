@@ -20,6 +20,7 @@ export interface SummaryInput {
   to: string;
   includeTransfers: boolean;
   wallets: string[];
+  hidden: string[]; // "kind:Category" keys left out of the summary
 }
 
 const r = (v: number) => Math.round(v);
@@ -104,6 +105,7 @@ export function buildSummary(inp: SummaryInput, o: SummaryOptions) {
       granularity: o.granularity,
       periods: B,
       wallets: inp.wallets.length ? inp.wallets : "all",
+      excludedCategories: inp.hidden.map((k) => { const [kind, ...rest] = k.split(":"); return `${rest.join(":")} (${kind})`; }),
       internalTransfers: inp.includeTransfers ? "included" : "excluded",
       transactions: txs.length,
       dataQuality: {
@@ -144,6 +146,7 @@ export function toMarkdown(s: Summary, o: SummaryOptions): string {
   out.push(
     `- Period: ${s.meta.period.from} to ${s.meta.period.to} (${s.meta.period.months} months), broken down per ${s.meta.granularity}`,
     `- Wallets: ${s.meta.wallets === "all" ? "all" : (s.meta.wallets as string[]).join(", ")}; internal transfers ${s.meta.internalTransfers}; ${s.meta.transactions} transactions`,
+    ...(s.meta.excludedCategories.length ? [`- Deliberately EXCLUDED from all figures below: ${s.meta.excludedCategories.join(", ")}. Totals and savings rate are without them.`] : []),
     `- ${s.meta.signConvention}`,
     `- Data quality: ${p(s.meta.dataQuality.autoCategorisedShareOfSpending)} of spending was auto-categorised by rules; uncategorised spending ${s.meta.dataQuality.uncategorisedSpending} ${c}, uncategorised income ${s.meta.dataQuality.uncategorisedIncome} ${c}.`,
     "",
@@ -174,7 +177,7 @@ export function toMarkdown(s: Summary, o: SummaryOptions): string {
   catSection(`## Income by category per ${s.meta.granularity}`, s.incomeByCategory);
 
   out.push(`## Spending by group per ${s.meta.granularity}`, "",
-    "Groups: Fixed & obligations (housing, mortgage, insurance, social insurance, bank fees), Essentials (groceries, health, transport, education), Lifestyle (restaurants, travel, entertainment, clothing, self care, gifts), Business costs (company taxes, software, equipment).", "",
+    "Groups: Fixed & obligations (housing, mortgage, insurance, social insurance, bank fees), Essentials (groceries, health, transport, education), Lifestyle (restaurants, travel, entertainment, clothing, self care, gifts), Business costs (accounting, software, equipment), Taxes (VAT and income tax), Unclassified (categories not mapped to a group).", "",
     mdTable(["Group", ...s.meta.periods, "Total", "Share"], s.spendingByGroup.map((g) => [g.group, ...g.values, g.total, p(g.share)])), "");
 
   if (s.changeVsPreviousPeriod.length) {

@@ -25,7 +25,7 @@ export default function AiExport() {
     const opts: SummaryOptions = { granularity: g, subcategories, merchants, topMerchants: 25, anomalies, preface: usePreface ? preface : "" };
     if (fmt === "csv") return toLongCsv(txs, g);
     const prevTxs = applyFilters(ds, { ...filters, from: shiftMonth(filters.from, -months.length), to: shiftMonth(filters.from, -1) });
-    const s = buildSummary({ ds, txs, prevTxs, months, from: filters.from, to: filters.to, includeTransfers: filters.includeTransfers, wallets: filters.wallets }, opts);
+    const s = buildSummary({ ds, txs, prevTxs, months, from: filters.from, to: filters.to, includeTransfers: filters.includeTransfers, wallets: filters.wallets, hidden: filters.hidden }, opts);
     if (fmt === "json") return JSON.stringify(usePreface ? { instructions: preface, ...s } : s, null, 1);
     return toMarkdown(s, opts);
   }, [fmt, g, subcategories, merchants, anomalies, usePreface, preface, ds, txs, months, filters]);

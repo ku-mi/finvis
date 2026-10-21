@@ -20,7 +20,7 @@ export default function Merchants() {
   const shown = stats.filter((m) => !hideObligations || !NOT_MERCHANTS.test(m.name));
   const rec = useMemo(() => recurring(stats), [stats]);
 
-  const groups = ["fixed", "essentials", "lifestyle", "business"] as const;
+  const groups = ["fixed", "essentials", "lifestyle", "business", "taxes", "other"] as const;
   const bubbleOpt = useMemo(() => {
     const top = shown.slice(0, 150);
     const maxT = Math.max(...top.map((m) => m.total), 1);

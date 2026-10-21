@@ -67,13 +67,14 @@ export function DataProvider({ raw, children }: { raw: RawExport | null; childre
     to: lastMonth,
     wallets: [],
     includeTransfers: false,
+    hidden: [],
   }));
   const [granularity, setGranularity] = useState<Granularity>("month");
 
   useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(LS_KEY) ?? "null");
-      if (saved?.filters) setF((f) => ({ ...f, ...saved.filters }));
+      if (saved?.filters) setF((f) => ({ ...f, ...saved.filters, hidden: Array.isArray(saved.filters.hidden) ? saved.filters.hidden : [] }));
       if (saved?.granularity) setGranularity(saved.granularity);
     } catch {}
   }, []);

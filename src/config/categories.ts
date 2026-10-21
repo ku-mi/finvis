@@ -3,7 +3,7 @@
 // resolved by emoji. Custom categories/subcategories keep the name from the export.
 // Edit freely — this is the single place to rename things.
 
-export type SpendGroup = "fixed" | "essentials" | "lifestyle" | "business";
+export type SpendGroup = "fixed" | "essentials" | "lifestyle" | "business" | "taxes" | "other";
 
 /** Category name keyed by the emoji of its FIRST subcategory (stable in Finantly defaults). */
 export const CATEGORY_BY_FIRST_EMOJI: Record<string, string> = {
@@ -45,12 +45,19 @@ export const SUBCATEGORY_BY_EMOJI: Record<string, string> = {
 
 /** Name for transactions that have a category but no subcategory, keyed by category name. */
 export const GENERAL_SUBCATEGORY: Record<string, string> = {
-  Company: "Taxes & VAT",
+  Company: "General",
   "Gifts & Misc": "Unspecified",
+  VAT: "VAT",
+  "PPE TAX": "Income tax",
 };
 
-/** Group used for the "Fixed / Essentials / Lifestyle / Business" angle. Keyed by category name. */
+/**
+ * Group used for the "Fixed / Essentials / Lifestyle / Business / Taxes" angle. Keyed by category name.
+ * Categories not listed here go to "taxes" if their name looks like a tax (see TAX_NAME), otherwise "other".
+ */
 export const GROUP_BY_CATEGORY: Record<string, SpendGroup> = {
+  VAT: "taxes",
+  "PPE TAX": "taxes",
   Housing: "fixed",
   "Insurance & ZUS": "fixed",
   Company: "business",
@@ -78,7 +85,12 @@ export const GROUP_LABEL: Record<SpendGroup, string> = {
   essentials: "Essentials",
   lifestyle: "Lifestyle",
   business: "Business costs",
+  taxes: "Taxes",
+  other: "Unclassified",
 };
+
+/** Fallback for categories missing from GROUP_BY_CATEGORY whose name looks like a tax. */
+export const TAX_NAME = /(tax|vat|pit|cit|ppe|podatw*)/i;
 
 /**
  * Extra categorisation rules for transactions left uncategorised in the export.
@@ -87,11 +99,13 @@ export const GROUP_LABEL: Record<SpendGroup, string> = {
 export const EXTRA_RULES: {
   test: RegExp;
   sign: "income" | "expense";
-  category: string;
+  /** First category name that exists in the export wins. */
+  category: string[];
   subcategory?: string;
 }[] = [
   // Monthly B2B invoice payments ("1/09/2026", "/VAT/.../INV/1/04/2025/...")
-  { test: /(^|\/INV\/|\/TXT\/)1\/\d{2}\/\d{4}/, sign: "income", category: "Salary & B2B", subcategory: "Salary / invoices" },
-  // Tax office transfers (VAT-7, PIT)
-  { test: /\/TI\/|VAT-7|PIT-?\d/i, sign: "expense", category: "Company", subcategory: "Taxes" },
+  { test: /(^|\/INV\/|\/TXT\/)1\/\d{2}\/\d{4}/, sign: "income", category: ["Salary & B2B"], subcategory: "Salary / invoices" },
+  // Tax office transfers: VAT first (VAT-7 return, split payment), then income tax (PIT / PPE)
+  { test: /VAT-7|VAT-UE|^\/VAT\//i, sign: "expense", category: ["VAT", "Company"], subcategory: "VAT" },
+  { test: /\/TI\/|PIT-?\d|\bPPE\b/i, sign: "expense", category: ["PPE TAX", "Company"], subcategory: "Income tax" },
 ];

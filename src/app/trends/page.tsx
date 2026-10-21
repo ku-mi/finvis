@@ -59,7 +59,7 @@ export default function Trends() {
     const ext = [shiftMonth(months[0], -2), shiftMonth(months[0], -1), ...months];
     const extTx = applyFilters(ds, { ...filters, from: ext[0] });
     const piv = pivot(extTx, "expense", ext, (t) => t.group);
-    const groups = (["fixed", "essentials", "lifestyle", "business"] as SpendGroup[]).filter((g) => piv.has(g));
+    const groups = (["fixed", "essentials", "lifestyle", "business", "taxes", "other"] as SpendGroup[]).filter((g) => piv.has(g));
     const roll = (arr: number[]) => arr.slice(2).map((_, i) => mean(arr.slice(i, i + 3)));
     return {
       ...base(mode),

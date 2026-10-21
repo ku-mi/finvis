@@ -5,6 +5,7 @@ import {
   GROUP_BY_CATEGORY,
   GROUP_BY_SUBCATEGORY,
   SUBCATEGORY_BY_EMOJI,
+  TAX_NAME,
   type SpendGroup,
 } from "@/config/categories";
 import type { Dataset, Kind, MortgageHint, RawExport, Tx } from "./types";
@@ -106,8 +107,9 @@ export function normalize(raw: RawExport): Dataset {
       } else {
         const sign = t.amount >= 0 ? "income" : "expense";
         const rule = EXTRA_RULES.find((r) => r.sign === sign && r.test.test(t.description));
-        if (rule && nameToId.has(rule.category)) {
-          catId = nameToId.get(rule.category)!;
+        const target = rule?.category.find((c) => nameToId.has(c));
+        if (rule && target) {
+          catId = nameToId.get(target)!;
           subId = null;
           subName = rule.subcategory;
           inferred = true;
@@ -122,7 +124,7 @@ export function normalize(raw: RawExport): Dataset {
     const group: Tx["group"] =
       kind === "income"
         ? "income"
-        : GROUP_BY_SUBCATEGORY[subcategory] ?? GROUP_BY_CATEGORY[category] ?? ("lifestyle" as SpendGroup);
+        : GROUP_BY_SUBCATEGORY[subcategory] ?? GROUP_BY_CATEGORY[category] ?? ((TAX_NAME.test(category) ? "taxes" : "other") as SpendGroup);
 
     txs.push({
       id: t.id,

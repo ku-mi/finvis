@@ -148,3 +148,25 @@ pre.out {
 .ranklist li { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .bar-bg { grid-column: span 2; height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
 .bar-bg > div { height: 100%; border-radius: 3px; }
+
+/* ---------- category filter popover ---------- */
+.btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.btn.ghost { padding: 6px 9px; }
+.pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: min(420px, calc(100vw - 32px));
+  background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+.pop-sec + .pop-sec { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip, .chip button {
+  font: inherit; font-size: 12.5px; color: var(--ink-2); background: var(--surface-2); border: 0; cursor: pointer;
+}
+.chip { display: inline-flex; align-items: center; gap: 2px; padding: 4px 10px; border-radius: 99px; border: 1px solid transparent; }
+.chip button { padding: 0; background: transparent; }
+.chip .x { margin-left: 6px; color: var(--muted); }
+.chip.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.chip.on button { color: var(--accent); font-weight: 600; }
+.chip.off { text-decoration: line-through; opacity: 0.7; }
+.cat-row { display: flex; align-items: center; gap: 8px; padding: 4px 2px; cursor: pointer; border-radius: 6px; }
+.cat-row:hover { background: var(--surface-2); }

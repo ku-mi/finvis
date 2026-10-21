@@ -111,7 +111,9 @@ export default function Overview() {
 
   return (
     <>
-      <PageHead title="Overview">{period} · {monthRange(filters.from, filters.to).length} months. All amounts in {ds.currency}.</PageHead>
+      <PageHead title="Overview">{period} · {monthRange(filters.from, filters.to).length} months. All amounts in {ds.currency}.
+        {filters.hidden.length > 0 && <> Excluding {filters.hidden.map((k) => k.slice(k.indexOf(":") + 1)).join(", ")}.</>}
+      </PageHead>
       <div className="grid">
         <Kpi label="Income" value={money(t.income)} delta={rel(t.income, prev?.income)} />
         <Kpi label="Spending" value={money(t.expense)} delta={rel(t.expense, prev?.expense)} goodWhenUp={false} />
@@ -121,7 +123,7 @@ export default function Overview() {
         <Card span={8} title="Income vs spending" sub="Income above the line, spending below; the line is what was left over.">
           <EChart option={flowOpt as any} height={320} />
         </Card>
-        <Card span={4} title="Where spending lands" sub="Fixed obligations vs essentials vs lifestyle choices.">
+        <Card span={4} title="Where spending lands" sub="Fixed obligations, essentials, lifestyle choices, business costs and taxes.">
           <EChart option={groupOpt as any} height={320} />
         </Card>
 

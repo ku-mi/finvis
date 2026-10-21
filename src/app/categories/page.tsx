@@ -15,6 +15,7 @@ export default function Categories() {
   const k = INK[mode];
   const [kind, setKind] = useState<Kind>("expense");
   const [stackMode, setStackMode] = useState<"abs" | "share">("abs");
+  const [split, setSplit] = useState(true); // false = smaller categories folded into "Other"
   const [heatMode, setHeatMode] = useState<"abs" | "rel">("rel");
   const [focus, setFocus] = useState<string | null>(null);
   const order = ds.categoryOrder[kind];
@@ -43,29 +44,41 @@ export default function Categories() {
     };
   }, [cats, txs, kind, mode, piv]);
 
-  // ---- stacked bars over time (fold into 7 + Other) ----
+  // ---- stacked bars over time (every category, or 7 + Other) ----
   const stack = useMemo(() => {
     const folded = new Map<string, number[]>();
+    const members: string[] = []; // categories inside "Other", for its tooltip
     for (const c of cats) {
-      const key = foldKey(order, c);
+      const key = split ? c : foldKey(order, c);
+      if (key === OTHER) members.push(c);
       const row = folded.get(key) ?? new Array(buckets.length).fill(0);
       piv.get(c)!.forEach((v, i) => (row[i] += v));
       folded.set(key, row);
     }
-    const keys = [...folded.keys()].sort((a, b) => (a === OTHER ? 1 : b === OTHER ? -1 : order.indexOf(a) - order.indexOf(b)));
+    const rank = (c: string) => (c === OTHER ? 1e6 : order.indexOf(c) < 0 ? 1e5 : order.indexOf(c));
+    const keys = [...folded.keys()].sort((a, b) => rank(a) - rank(b));
     const totalsPerBucket = buckets.map((_, i) => sum(keys.map((key) => folded.get(key)![i])));
-    return { keys, folded, totalsPerBucket };
-  }, [cats, piv, order, buckets]);
+    return { keys, folded, totalsPerBucket, members };
+  }, [cats, piv, order, buckets, split]);
 
   const stackOpt = useMemo(() => ({
     ...base(mode),
-    legend: { ...(base(mode).legend as object), data: stack.keys },
+    legend: { ...(base(mode).legend as object), data: stack.keys, right: 0 },
+    // the legend wraps onto extra rows when every category is shown
+    grid: { ...(base(mode).grid as object), top: stack.keys.length > 8 ? 64 : 36 },
     tooltip: {
       ...(base(mode).tooltip as object), trigger: "axis", axisPointer: { type: "shadow" },
       formatter: (ps: any[]) => {
         const i = ps[0].dataIndex;
-        const rows = [...ps].filter((p) => stack.folded.get(p.seriesName)![i] !== 0).reverse()
-          .map((p) => `${dot(p.color)}${p.seriesName} <b style="float:right;margin-left:16px">${money(stack.folded.get(p.seriesName)![i])}</b>`);
+        const row = (color: string, name: string, v: number, indent = false) =>
+          `${indent ? '<span style="display:inline-block;width:14px"></span>' : dot(color)}${indent ? `<span style="color:${k.secondary}">${name}</span>` : name} <b style="float:right;margin-left:16px">${money(v)}</b>`;
+        const rows = [...ps].filter((p) => stack.folded.get(p.seriesName)![i] !== 0).reverse().flatMap((p) => {
+          const out = [row(p.color, p.seriesName, stack.folded.get(p.seriesName)![i])];
+          if (p.seriesName === OTHER)
+            for (const c of [...stack.members].sort((a, b) => piv.get(b)![i] - piv.get(a)![i]))
+              if (piv.get(c)![i]) out.push(row("", c, piv.get(c)![i], true));
+          return out;
+        });
         return `<b>${ps[0].axisValue}</b> · ${money(stack.totalsPerBucket[i])}<br/>${rows.join("<br/>")}`;
       },
     },
@@ -77,7 +90,7 @@ export default function Categories() {
       itemStyle: { color: col(key), borderColor: k.surface, borderWidth: 1, borderRadius: si === stack.keys.length - 1 ? [4, 4, 0, 0] : 0 },
       emphasis: { focus: "series" },
     })),
-  }), [stack, stackMode, buckets, mode]);
+  }), [stack, stackMode, buckets, mode, piv]);
 
   // ---- heatmap category × bucket ----
   const heat = useMemo(() => {
@@ -169,8 +182,15 @@ export default function Categories() {
         <Card
           span={7}
           title={`${kind === "expense" ? "Spending" : "Income"} by category, ${granularity === "month" ? "per month" : "per year"}`}
-          sub="Top 7 categories keep their colour everywhere; the rest fold into Other. Click the legend to hide one."
-          right={<Seg label="Scale" value={stackMode} onChange={setStackMode} options={[{ v: "abs", l: "Amount" }, { v: "share", l: "Share" }]} />}
+          sub={split
+            ? "The top 7 categories keep their colour everywhere; the smaller ones get shades of grey (hover for names). Click a legend entry to hide it."
+            : "The top 7 categories keep their colour everywhere; the rest are grouped into Other (hover to see what's inside)."}
+          right={
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <Seg label="Smaller categories" value={split ? "split" : "fold"} onChange={(v) => setSplit(v === "split")} options={[{ v: "split", l: "Each category" }, { v: "fold", l: "Group as Other" }]} />
+              <Seg label="Scale" value={stackMode} onChange={setStackMode} options={[{ v: "abs", l: "Amount" }, { v: "share", l: "Share" }]} />
+            </div>
+          }
         >
           <EChart option={stackOpt as any} height={400} onEvents={useMemo(() => ({ click: (p: any) => p.seriesName !== OTHER && setFocus(p.seriesName) }), [])} />
         </Card>

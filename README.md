@@ -26,12 +26,12 @@ Data is read from `data/finance.json` (git-ignored). You can point to another fi
 | Transactions | every row | Search, filter and sort, CSV download |
 | AI summary | export | Markdown / JSON / tidy CSV per category per month or year, with an editable instruction preface |
 
-The filter bar (period, monthly/yearly, wallet, internal transfers) applies to every page. The seasonal views (year clock, year race, bump chart, boxplot) always use every year in the data.
+The filter bar (period, monthly/yearly, wallet, internal transfers, categories) applies to every page. The category control hides any categories you pick, or whole groups, from every chart, total and AI summary. You can save a selection as a named view (e.g. "No taxes"); views are stored in your browser. The seasonal views (year clock, year race, bump chart, boxplot) always use every year in the data.
 
 ## Data handling
 
 - `wallet-balance-change` rows (asset revaluations) are ignored. Split transactions are replaced by their parts.
 - Rows with `includeInAnalysis: false` (mostly transfers between your own accounts) are hidden unless you tick "Include internal transfers".
-- Finantly's default categories have no names in the export, so names are resolved from emoji in `src/config/categories.ts`. Edit that file to rename categories, change the Fixed / Essentials / Lifestyle / Business grouping, or add auto-categorisation rules.
+- Finantly's default categories have no names in the export, so names are resolved from emoji in `src/config/categories.ts`. Edit that file to rename categories, change the Fixed / Essentials / Lifestyle / Business / Taxes grouping, or add auto-categorisation rules. Categories missing from the grouping go to Taxes when the name looks like a tax (VAT, PIT, PPE…), otherwise to Unclassified.
 - Uncategorised rows are matched against Finantly's own `suggestions` patterns first, then against `EXTRA_RULES`. Rows categorised this way are marked **auto** in the Transactions table.
 - Profile and subscription details are stripped on the server and never reach the browser.

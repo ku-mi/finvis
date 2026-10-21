@@ -5,7 +5,12 @@ export interface Filters {
   to: string; // YYYY-MM inclusive
   wallets: string[]; // empty = all
   includeTransfers: boolean;
+  /** Categories left out of every view, as "kind:Category name" keys (see catKey). */
+  hidden: string[];
 }
+
+/** Stable key for a category: names can repeat across kinds (e.g. "Uncategorised"). */
+export const catKey = (t: { kind: string; category: string }) => `${t.kind}:${t.category}`;
 
 export function monthRange(from: string, to: string): string[] {
   const out: string[] = [];
@@ -25,8 +30,10 @@ export function shiftMonth(ym: string, delta: number): string {
 }
 
 export function applyFilters(ds: Dataset, f: Filters): Tx[] {
+  const hidden = new Set(f.hidden ?? []);
   return ds.txs.filter(
     (t) =>
+      !hidden.has(catKey(t)) &&
       t.ym >= f.from &&
       t.ym <= f.to &&
       (f.includeTransfers || t.included) &&
