@@ -2,7 +2,7 @@
 // Pure functions — no dependency on the finance dataset.
 
 export type InstallmentType = "annuity" | "decreasing"; // equal instalments / decreasing instalments
-export type Strategy = "shorten" | "lower" | "snowball";
+export type Strategy = "shorten" | "lower" | "snowball" | "budget";
 
 export interface MortgageInput {
   principal: number;
@@ -11,6 +11,7 @@ export interface MortgageInput {
   start: string; // YYYY-MM of the first instalment
   type: InstallmentType;
   monthlyOverpayment: number;
+  monthlyBudget: number; // "budget" strategy: instalment + overpayment together
   overpaymentFrom: string; // YYYY-MM
   overpaymentTo: string; // YYYY-MM, "" = until paid off
   lumps: { month: string; amount: number }[];
@@ -95,8 +96,11 @@ export function simulate(inp: MortgageInput, withOverpayments = true): Result {
     if (withOverpayments) {
       const inWindow = month >= inp.overpaymentFrom && (!inp.overpaymentTo || month <= inp.overpaymentTo);
       const lump = lumpAt.get(month) ?? 0;
-      if (inp.strategy === "snowball" && inWindow) {
-        // keep the total monthly outlay fixed: whatever the instalment drops by goes to overpayment
+      if (inp.strategy === "budget" && inWindow) {
+        // whatever the instalment leaves of the budget is overpaid; an instalment above the budget is still due
+        over = Math.max(inp.monthlyBudget - payment, 0) + lump;
+      } else if (inp.strategy === "snowball" && inWindow) {
+        // keep the starting total fixed: whatever the instalment drops by goes to overpayment
         if (!baseOutlay) baseOutlay = payment + inp.monthlyOverpayment;
         over = Math.max(baseOutlay - payment, 0) + lump;
       } else {
@@ -109,11 +113,12 @@ export function simulate(inp: MortgageInput, withOverpayments = true): Result {
     if (balance < 0.005) balance = 0;
 
     if (over > 0 && balance > 0) {
-      if (inp.strategy === "lower") {
+      if (inp.strategy !== "shorten") {
+        // the bank lowers the instalment for the same term; snowball/budget then overpay what it freed up
         A = annuity(balance, r, remaining);
         K = balance / remaining;
       } else {
-        // shorten / snowball: keep the instalment, the term shrinks
+        // keep the instalment, the term shrinks
         remaining = inp.type === "annuity" ? Math.max(1, nper(balance, r, A)) : Math.max(1, Math.ceil(balance / K));
       }
     }

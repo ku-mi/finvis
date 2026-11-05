@@ -20,6 +20,7 @@ const DEFAULT: MortgageInput = {
   start: addMonths(thisMonth(), 1),
   type: "annuity",
   monthlyOverpayment: 1000,
+  monthlyBudget: 0,
   overpaymentFrom: addMonths(thisMonth(), 1),
   overpaymentTo: "",
   lumps: [],
@@ -49,7 +50,7 @@ function Mortgage() {
     let v: MortgageInput = DEFAULT;
     try { const s = JSON.parse(localStorage.getItem(LS) ?? "null"); if (s) v = { ...DEFAULT, ...s }; } catch {}
     const op = Number(params.get("overpay"));
-    if (op > 0) v = { ...v, monthlyOverpayment: op };
+    if (op > 0) v = { ...v, monthlyOverpayment: op, monthlyBudget: Math.round(simulate(v, false).firstPayment + op) };
     setInp(v);
     setLoaded(true);
   }, [params]);
@@ -62,12 +63,14 @@ function Mortgage() {
   // sensitivity: same plan with different monthly overpayments
   const sens = useMemo(() => {
     if (!valid || !baseRes) return [];
-    const top = Math.max(2000, Math.ceil((inp.monthlyOverpayment * 2) / 1000) * 1000, Math.ceil(baseRes.firstPayment / 1000) * 1000);
+    const first = baseRes.firstPayment;
+    const current = inp.strategy === "budget" ? Math.max(inp.monthlyBudget - first, 0) : inp.monthlyOverpayment;
+    const top = Math.max(2000, Math.ceil((current * 2) / 1000) * 1000, Math.ceil(first / 1000) * 1000);
     const step = top / 10;
     return Array.from({ length: 11 }, (_, i) => {
       const amt = i * step;
-      const r = simulate({ ...inp, monthlyOverpayment: amt }, true);
-      return { amt, interest: r.totalInterest, end: r.end, months: r.months };
+      const r = simulate({ ...inp, monthlyOverpayment: amt, monthlyBudget: first + amt }, true);
+      return { amt, budget: first + amt, current: Math.abs(amt - current) <= step / 2, interest: r.totalInterest, end: r.end, months: r.months };
     });
   }, [inp, valid, baseRes]);
 
@@ -167,16 +170,17 @@ function Mortgage() {
   };
 
   // ---- sensitivity ----
+  const isBudget = inp.strategy === "budget";
   const sensOpt = {
     ...base(mode),
     grid: { ...(base(mode).grid as object), top: 24, bottom: 30 },
     tooltip: { ...(base(mode).tooltip as object), trigger: "axis", axisPointer: { type: "shadow" },
-      formatter: (ps: any[]) => { const s = sens[ps[0].dataIndex]; return `<b>+${money(s.amt)}/month</b><br/>interest ${money(s.interest)}<br/>saves ${money(baseRes.totalInterest - s.interest)}<br/>paid off ${ymLong(s.end)} (${(s.months / 12).toFixed(1)} yrs)`; } },
-    xAxis: catAxis(mode, sens.map((s) => `+${compact(s.amt)}`), { name: "monthly overpayment", nameLocation: "middle", nameGap: 26, nameTextStyle: { color: k.muted } }),
+      formatter: (ps: any[]) => { const s = sens[ps[0].dataIndex]; return `<b>${isBudget ? `${money(s.budget)} in total` : `+${money(s.amt)}`}/month</b><br/>interest ${money(s.interest)}<br/>saves ${money(baseRes.totalInterest - s.interest)}<br/>paid off ${ymLong(s.end)} (${(s.months / 12).toFixed(1)} yrs)`; } },
+    xAxis: catAxis(mode, sens.map((s) => (isBudget ? compact(s.budget) : `+${compact(s.amt)}`)), { name: isBudget ? "total paid per month" : "monthly overpayment", nameLocation: "middle", nameGap: 26, nameTextStyle: { color: k.muted } }),
     yAxis: valAxis(mode, { name: "total interest", nameTextStyle: { color: k.muted, align: "left" } }),
     series: [{
       type: "bar", barMaxWidth: 34,
-      data: sens.map((s) => ({ value: s.interest, itemStyle: { color: C.interest, opacity: Math.abs(s.amt - inp.monthlyOverpayment) < 1 ? 1 : 0.45, borderRadius: [4, 4, 0, 0] } })),
+      data: sens.map((s) => ({ value: s.interest, itemStyle: { color: C.interest, opacity: s.current ? 1 : 0.45, borderRadius: [4, 4, 0, 0] } })),
       label: { show: true, position: "top", color: k.secondary, fontSize: 10, formatter: (p: any) => sens[p.dataIndex].end.slice(0, 4) },
     }],
   };
@@ -218,13 +222,13 @@ function Mortgage() {
         <Card span={6} title="Interest paid so far" sub="The gap between the lines is interest you don't pay.">
           <EChart option={cumOpt as any} height={300} />
         </Card>
-        <Card span={6} title="Your monthly outlay" sub={inp.strategy === "lower" ? "With 'lower instalment', each overpayment shrinks the next instalments." : "Instalment plus overpayment, month by month."}>
+        <Card span={6} title="Your monthly outlay" sub={inp.strategy === "shorten" ? "Instalment plus overpayment, month by month." : "Each overpayment shrinks the next instalments."}>
           <EChart option={payOpt as any} height={280} />
         </Card>
         <Card span={6} title="Total cost of the loan" sub="Principal is the same either way; the difference is interest.">
           <EChart option={costOpt as any} height={280} />
         </Card>
-        <Card span={12} title="How much does each extra złoty help?" sub="Total interest for different monthly overpayments (same plan otherwise). The label shows the payoff year; your current choice is highlighted.">
+        <Card span={12} title="How much does each extra złoty help?" sub={`Total interest for different ${isBudget ? "monthly totals" : "monthly overpayments"} (same plan otherwise). The label shows the payoff year; the bar closest to your current choice is highlighted.`}>
           <EChart option={sensOpt as any} height={280} />
         </Card>
         <Card span={12} title="Repayment schedule" sub="Per year; click a year to see its months.">
@@ -249,6 +253,7 @@ function Prefill({ inp, set }: { inp: MortgageInput; set: (p: Partial<MortgageIn
       overpaymentFrom: start,
       ...(isFinite(solved) ? { termMonths: solved } : {}),
       ...(m.overpaymentPerMonth ? { monthlyOverpayment: m.overpaymentPerMonth } : {}),
+      ...(m.installment ? { monthlyBudget: Math.round(m.installment + (m.overpaymentPerMonth ?? 0)) } : {}),
     });
   return (
     <Card span={12} title="Start from your data" sub="Mortgages found in the Finantly export.">
@@ -300,6 +305,7 @@ function Inputs({ inp, set }: { inp: MortgageInput; set: (p: Partial<MortgageInp
   const years = Math.floor(inp.termMonths / 12), months = inp.termMonths % 12;
   const g2 = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } as const;
   const r = inp.annualRate / 1200;
+  const first = inp.principal > 0 && inp.termMonths > 0 ? simulate(inp, false).firstPayment : 0;
   return (
     <>
       <Card span={12} title="Loan">
@@ -325,22 +331,37 @@ function Inputs({ inp, set }: { inp: MortgageInput; set: (p: Partial<MortgageInp
 
       <Card span={12} title="Overpayments">
         <div style={{ display: "grid", gap: 10 }}>
-          <label style={{ display: "grid", gap: 3 }}>
-            <span className="lbl">Every month: <b style={{ color: "var(--ink)" }}>{money(inp.monthlyOverpayment)}</b></span>
-            <input type="range" min={0} max={10000} step={100} value={Math.min(inp.monthlyOverpayment, 10000)} onChange={(e) => set({ monthlyOverpayment: +e.target.value })} style={{ accentColor: "var(--accent)" }} />
-          </label>
+          {inp.strategy === "budget" ? (
+            <div style={{ display: "grid", gap: 6 }}>
+              <Num label="Total per month (instalment + overpayment)" value={inp.monthlyBudget} step={100} suffix="zł" onChange={(v) => set({ monthlyBudget: v })} />
+              <input type="range" aria-label="Total per month" min={Math.ceil(first)} max={Math.ceil(first) + 10000} step={50} value={Math.min(Math.max(inp.monthlyBudget, first), first + 10000)}
+                onChange={(e) => set({ monthlyBudget: +e.target.value })} style={{ accentColor: "var(--accent)" }} />
+              <div className="note">
+                {inp.monthlyBudget > first
+                  ? `First month: ${money2(first)} zł instalment + ${money2(inp.monthlyBudget - first)} zł overpayment.`
+                  : `This is below the ${money2(first)} zł instalment, so nothing is overpaid. The instalment is still due in full.`}
+              </div>
+            </div>
+          ) : (
+            <label style={{ display: "grid", gap: 3 }}>
+              <span className="lbl">Every month: <b style={{ color: "var(--ink)" }}>{money(inp.monthlyOverpayment)}</b></span>
+              <input type="range" min={0} max={10000} step={100} value={Math.min(inp.monthlyOverpayment, 10000)} onChange={(e) => set({ monthlyOverpayment: +e.target.value })} style={{ accentColor: "var(--accent)" }} />
+            </label>
+          )}
           <div style={g2}>
             <Month label="From" value={inp.overpaymentFrom} onChange={(v) => set({ overpaymentFrom: v })} />
             <Month label="Until (empty = to the end)" value={inp.overpaymentTo} onChange={(v) => set({ overpaymentTo: v })} allowEmpty />
           </div>
           <div>
             <div className="lbl" style={{ marginBottom: 3 }}>After an overpayment</div>
-            <Seg label="Strategy" value={inp.strategy} onChange={(v) => set({ strategy: v })}
-              options={[{ v: "shorten", l: "Shorter term" }, { v: "lower", l: "Lower instalment" }, { v: "snowball", l: "Keep outlay" }]} />
+            <Seg label="Strategy" value={inp.strategy}
+              onChange={(v) => set({ strategy: v, ...(v === "budget" && !inp.monthlyBudget ? { monthlyBudget: Math.ceil((first + inp.monthlyOverpayment) / 100) * 100 } : {}) })}
+              options={[{ v: "shorten", l: "Shorter term" }, { v: "lower", l: "Lower instalment" }, { v: "snowball", l: "Keep outlay" }, { v: "budget", l: "Fixed total" }]} />
             <div className="note" style={{ marginTop: 4 }}>
               {inp.strategy === "shorten" && "The instalment stays the same and the loan ends sooner. This usually saves the most interest."}
               {inp.strategy === "lower" && "The term stays the same and the next instalments get smaller."}
-              {inp.strategy === "snowball" && "Your total monthly outlay stays fixed: whenever the instalment drops (decreasing instalments, a rate cut), the difference is overpaid too."}
+              {inp.strategy === "snowball" && "Each overpayment lowers the next instalment, and the amount it drops by is added to your overpayment. Your starting total (instalment + overpayment) stays the same, so the overpayment grows every month and the loan ends sooner."}
+              {inp.strategy === "budget" && "You set one amount for the month. Each overpayment lowers the next instalment, and everything left of your amount is overpaid, so the overpayment grows every month and the loan ends sooner. One-off payments come on top."}
             </div>
           </div>
           <Num label="Overpayment fee" value={inp.overpaymentFee} step={0.5} suffix="%" onChange={(v) => set({ overpaymentFee: v })} />

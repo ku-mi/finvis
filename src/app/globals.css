@@ -86,7 +86,7 @@ select, input[type="text"], input[type="search"], input[type="month"] {
   font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line);
   border-radius: 8px; padding: 5px 8px;
 }
-.seg { display: inline-flex; background: var(--surface-2); border-radius: 8px; padding: 2px; }
+.seg { display: inline-flex; flex-wrap: wrap; background: var(--surface-2); border-radius: 8px; padding: 2px; }
 .seg button {
   font: inherit; border: 0; background: transparent; color: var(--ink-2); padding: 4px 10px; border-radius: 6px; cursor: pointer;
 }
