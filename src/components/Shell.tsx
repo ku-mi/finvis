@@ -23,7 +23,8 @@ const NAV = [
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { ds, loadRaw } = useData();
+  const { ds, hasData, loadRaw } = useData();
+  const needsData = !hasData && path !== "/mortgage";
   return (
     <div className="shell">
       <aside className="side">
@@ -42,13 +43,23 @@ export function Shell({ children }: { children: React.ReactNode }) {
           <ThemeToggle />
           <Uploader onLoad={loadRaw} compact />
           <span>
-            {ds.txs.length.toLocaleString("en-US")} transactions · exported {ds.exportedAt.slice(0, 10)}
+            {hasData ? `${ds.txs.length.toLocaleString("en-US")} transactions · exported ${ds.exportedAt.slice(0, 10)}` : "No data loaded"}
           </span>
         </div>
       </aside>
       <div className="main" style={path === "/mortgage" ? { paddingTop: 20 } : undefined}>
-        {path !== "/mortgage" && <FilterBar />}
-        {children}
+        {needsData ? (
+          <Uploader onLoad={loadRaw}>
+            <p className="note" style={{ marginTop: 24 }}>
+              No export at hand? The <Link href="/mortgage" style={{ color: "var(--accent)" }}>mortgage calculator</Link> works without one.
+            </p>
+          </Uploader>
+        ) : (
+          <>
+            {path !== "/mortgage" && <FilterBar />}
+            {children}
+          </>
+        )}
       </div>
     </div>
   );

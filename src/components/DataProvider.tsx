@@ -10,6 +10,8 @@ export type Granularity = "month" | "year";
 
 interface Ctx {
   ds: Dataset;
+  /** false when no export is loaded: data pages show the uploader, the mortgage calculator still works */
+  hasData: boolean;
   filters: Filters;
   setFilters: (f: Partial<Filters>) => void;
   granularity: Granularity;
@@ -33,6 +35,16 @@ export function useData() {
 }
 
 const LS_KEY = "finvis.filters.v1";
+
+const EMPTY: Dataset = {
+  currency: "PLN",
+  exportedAt: "",
+  txs: [],
+  wallets: [],
+  netWorth: [],
+  mortgages: [],
+  categoryOrder: { income: [], expense: [] },
+};
 
 function useMode(): Mode {
   const [mode, setMode] = useState<Mode>("light");
@@ -92,24 +104,23 @@ export function DataProvider({ raw, children }: { raw: RawExport | null; childre
 
   const setFilters = useCallback((p: Partial<Filters>) => setF((f) => ({ ...f, ...p })), []);
 
-  const value = useMemo<Ctx | null>(() => {
-    if (!ds) return null;
-    const txs = applyFilters(ds, filters);
+  const value = useMemo<Ctx>(() => {
+    const data = ds ?? EMPTY;
+    const txs = applyFilters(data, filters);
     const months = monthRange(filters.from, filters.to);
     const years = [...new Set(months.map((m) => m.slice(0, 4)))];
     return {
-      ds, filters, setFilters, granularity, setGranularity, txs, months,
+      ds: data, hasData: !!ds, filters, setFilters, granularity, setGranularity, txs, months,
       buckets: granularity === "month" ? months : years,
       bucketOf: granularity === "month" ? (t: Tx) => t.ym : (t: Tx) => String(t.year),
       firstMonth, lastMonth, mode, loadRaw,
     };
   }, [ds, filters, setFilters, granularity, firstMonth, lastMonth, mode, loadRaw]);
 
-  if (!value) return <Uploader onLoad={loadRaw} />;
   return <DataCtx.Provider value={value}>{children}</DataCtx.Provider>;
 }
 
-export function Uploader({ onLoad, compact }: { onLoad: (r: RawExport) => void; compact?: boolean }) {
+export function Uploader({ onLoad, compact, children }: { onLoad: (r: RawExport) => void; compact?: boolean; children?: React.ReactNode }) {
   const [err, setErr] = useState("");
   const read = async (file?: File) => {
     if (!file) return;
@@ -135,6 +146,7 @@ export function Uploader({ onLoad, compact }: { onLoad: (r: RawExport) => void; 
       <p>No data found at <code>data/finance.json</code>. Drop a Finantly JSON export here, or pick one. It stays in your browser.</p>
       {input}
       {err && <p className="err">{err}</p>}
+      {children}
     </main>
   );
 }
